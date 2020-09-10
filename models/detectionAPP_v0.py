@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import os
+import datetime
 
 # os.chdir('/home/pi/Projects/py/ML/tensorflow/models')
 
@@ -121,6 +122,18 @@ while True:
     t2 = cv2.getTickCount()
     time1 = (t2-t1)/freq
     frame_rate_calc = 1/time1
+
+    # Others --> save img when object shows/gone
+    print(scores[0][0])
+    nowTxt = datetime.datetime.now().strftime('%m-%d-%H%M%S')
+    if scores[0][0] > 0.5 and objExist is False:
+        objExist = True
+        print('Something appeared')
+        cv2.imwrite('../img/obj_detected_{}.jpeg'.format(nowTxt), frame)
+    elif scores[0][0] < 0.5 and objExist is True:
+        objExist = False
+        print('Something disappeared')
+        cv2.imwrite('../img/obj_gone_{}.jpeg'.format(nowTxt), frame)
 
     # Press 'q' to quit
     if cv2.waitKey(1) == ord('q'):
