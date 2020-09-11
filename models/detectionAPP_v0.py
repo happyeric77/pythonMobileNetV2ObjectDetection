@@ -3,6 +3,10 @@ import numpy as np
 import tensorflow as tf
 import os, re
 import datetime
+import requests
+from itertools import groupby
+import cloudinary
+from cloudinary import uploader
 
 # Grab path to current working directory
 CWD_PATH = os.getcwd()
@@ -72,7 +76,7 @@ img_width = 640
 img_height = 480
 
 objExist = False
-from itertools import groupby
+humanExist = False
 while True:
 
     t1 = cv2.getTickCount()
@@ -90,6 +94,7 @@ while True:
         feed_dict={image_tensor: frame_expanded})
         
     # Check how many object is detected
+    nowTxt = datetime.datetime.now().strftime('%m-%d-%H%M%S')
     allBoxes = groupby([np.sum(i) for i in boxes[0] ], lambda x: x>0)
     boxCount = 0
     for (key, value) in allBoxes:
@@ -100,12 +105,16 @@ while True:
 
     acc_thres = 0.5
     # list the class name of detected project
+
+    obj_list = []
     for i in range(boxCount):
         objectName = category_index[classes[0][i]]['name']
         if scores[0][i] > acc_thres:
             print('high confidency level obj:', objectName, scores[0][i])
+            obj_list.append(objectName)
         else:
             print('low confidency level obj:', objectName)
+    
     print('*'*50)
 
     # Draw the results of the detection (aka 'visulaize the results')
@@ -119,6 +128,34 @@ while True:
         line_thickness=8,
         min_score_thresh=acc_thres)
 
+
+    # Human Detection (& save img)
+    if ('person' in obj_list) and (humanExist == False):
+        humanExist = True
+        imgPath = '../img/human_detected_{}.jpeg'.format(nowTxt)
+        cv2.imwrite(imgPath, frame)
+
+        # Send img out by line
+        message = 'Somebody shows up here'
+        token = os.environ['LINE_NOTIFY_TOKEN']
+        def lineNotifyPicMessage(token, msg, pic):
+            headers = { "Authorization": "Bearer " + token}
+            payload = { 'message': msg }
+            files = {'imageFile': open(pic, 'rb')}
+            r = requests.post("https://notify-api.line.me/api/notify", headers = headers, params = payload, files = files)
+            return r
+        picURI = imgPath
+        r = lineNotifyPicMessage(token, message, picURI)
+
+    
+    if ('person' not in obj_list) and (humanExist == True):
+        humanExist = False
+        print('person left')
+
+
+
+    
+
     cv2.putText(frame,"FPS: {0:.2f}".format(frame_rate_calc),(30,50),font,1,(255,255,0),2,cv2.LINE_AA)
     
     # All the results have been drawn on the frame, so it's time to display it.
@@ -127,19 +164,6 @@ while True:
     t2 = cv2.getTickCount()
     time1 = (t2-t1)/freq
     frame_rate_calc = 1/time1
-
-    # Extra actions 
-    # save img when object shows/gone
-
-    nowTxt = datetime.datetime.now().strftime('%m-%d-%H%M%S')
-    if scores[0][0] > 0.5 and objExist is False:
-        objExist = True
-        print('Something appeared')
-        cv2.imwrite('../img/obj_detected_{}.jpeg'.format(nowTxt), frame)
-    elif scores[0][0] < 0.5 and objExist is True:
-        objExist = False
-        print('Something disappeared')
-        cv2.imwrite('../img/obj_gone_{}.jpeg'.format(nowTxt), frame)
 
     # Press 'q' to quit
     if cv2.waitKey(1) == ord('q'):
