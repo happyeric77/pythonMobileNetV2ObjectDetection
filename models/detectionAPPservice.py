@@ -1,4 +1,4 @@
-#!/home/pi/Projects/pyenv/ML/bin/python
+#!/usr/bin/python3
 import socket
 import os, re
 
