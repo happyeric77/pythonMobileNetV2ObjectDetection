@@ -1,7 +1,8 @@
-#!/usr/bin/python3
+#!/home/pi/Projects/pyenv/ML/bin/python
 import socket
-import os, re, time, threading, subprocess
-from detectionAPP_v2_noCAM import DetetionAPP 
+import os, re, time, threading, subprocess, cv2
+from detectionAPP_v3_noCAM import DetetionAPP 
+from detectionAPP_v3_noCAM import Cap_background
 
 model_dir = '/home/pi/Projects/py/ML/tensorflow/models'
 cam_stop = False
@@ -14,38 +15,25 @@ class Capture_thread(threading.Thread):
     def run(self):
         global cam_stop
         frameGen = detetionAPP.camera_cap()
-        # stream out the processed frame to Youtube using ffmpeg 
-        command = ['ffmpeg',
-            '-f', 'rawvideo',
-            '-pix_fmt', 'bgr24',
-            '-s','640x480',
-            '-i','-',
-            '-ar', '44100',
-            '-ac', '2',
-            '-acodec', 'pcm_s16le',
-            '-f', 's16le',
-            '-ac', '2',
-            '-i','/dev/zero',   
-            '-acodec','aac',
-            '-ab','128k',
-            '-strict','experimental',
-            '-vcodec','h264',
-            '-pix_fmt','yuv420p',
-            '-g', '50',
-            '-vb','1000k',
-            '-profile:v', 'baseline',
-            '-preset', 'ultrafast',
-            '-f', 'flv',
-            'rtmp://a.rtmp.youtube.com/live2/[Stream_key]']
-        pipe = subprocess.Popen(command, stdin=subprocess.PIPE)
-
         while True:
             self.frame = frameGen.__next__()
-            pipe.stdin.write(self.frame.tostring())
+            print('frame left', len(detetionAPP.camera.frame))
             if cam_stop == True:
                 break
 
-service_port = ('0.0.0.0', 9004)
+detetionAPP = DetetionAPP(model_dir)
+
+class Camera_stream(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        
+    def run(self):
+        detetionAPP.camera.start()
+
+camera_stream = Camera_stream()
+camera_stream.start()
+
+service_port = ('0.0.0.0', 9005)
 
 serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -55,7 +43,8 @@ print('socket established with {}'.format(service_port))
 serv.listen()
 print('Start listening')
 
-detetionAPP = DetetionAPP(model_dir)
+
+
 
 while True:
     conn, addr = serv.accept()
@@ -74,9 +63,9 @@ while True:
             if detetionAPP.cam_status == True:
                 res = "HTTP/1.1 200 OK\n"+"Content-Type: text/html\n"+"\n"+"camera is already 'ON', no need to restart"
             else:
-                # Try Turn camera capture on (time.sleep depands on capture speed)                
+                # Try Turn camera capture on (time.sleep depands on capture speed)
+                
                 try:
-                    # cam_thread = threading.Thread(target=cam_init)
                     cam_thread = Capture_thread()
                     cam_stop = False
                     cam_thread.start()
