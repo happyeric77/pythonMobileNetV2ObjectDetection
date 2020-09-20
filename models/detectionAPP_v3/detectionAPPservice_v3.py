@@ -1,6 +1,6 @@
-#!/home/pi/Projects/pyenv/ML/bin/python
+#!/usr/bin/python3
 import socket
-import os, re, time, threading, subprocess, cv2
+import os, re, time, threading, subprocess
 from detectionAPP_v3_noCAM import DetetionAPP 
 from detectionAPP_v3_noCAM import Cap_background
 
